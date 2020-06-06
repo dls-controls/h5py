@@ -146,6 +146,27 @@ class TestSimpleSlicing(TestCase):
         with self.assertRaises(TypeError):
             dset[:, 1] = x
 
+    def test_scalar_2d_broadcast(self):
+        dset = self.f.create_dataset('2d', (10, 6))
+
+        dset[1::3] = 1
+
+        np.testing.assert_array_equal(
+            dset,
+            np.array([
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0]
+            ])
+        )
+
 class TestArraySlicing(BaseSlicing):
 
     """
@@ -414,3 +435,30 @@ class TestMultiBlockSlice(BaseSlicing):
 
         with self.assertRaises(ValueError):
             mbslice.indices(10)
+
+    def test_scalar_1d_broadcast(self):
+        self.dset[h5py.MultiBlockSlice(start=1, stride=3, block=2)] = 10
+        np.testing.assert_array_equal(
+            self.dset, np.array([0, 10, 10, 3, 10, 10, 6, 10, 10, 9])
+        )
+
+    def test_scalar_2d_broadcast(self):
+        dset = self.f.create_dataset('2d', shape=(10, 6), dtype=np.float32)
+
+        dset[h5py.MultiBlockSlice(start=1, stride=3, block=2)] = 1
+
+        np.testing.assert_array_equal(
+            dset,
+            np.array([
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1],
+                [0, 0, 0, 0, 0, 0]
+            ])
+        )
