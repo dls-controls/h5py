@@ -289,7 +289,9 @@ class SimpleSelection(Selection):
     @property
     def mshape(self):
         """ Shape of current selection """
-        return self._sel[1]
+        count = self._sel[1]
+        block = self._block_shape
+        return tuple(_count * _block for _count, _block in zip(count, block))
 
     @property
     def array_shape(self):
@@ -300,6 +302,7 @@ class SimpleSelection(Selection):
         rank = len(self.shape)
         self._sel = ((0,)*rank, self.shape, (1,)*rank, (False,)*rank)
         self._array_shape = self.shape
+        self._block_shape = (1,)*rank
 
     def __getitem__(self, args):
 
@@ -316,10 +319,11 @@ class SimpleSelection(Selection):
 
         self._id.select_hyperslab(start, count, stride, block)
 
-        length = tuple(count * block for count, block in zip(count, block))
-        self._sel = (start, length, stride, scalar)
+        self._block_shape = block
+        self._sel = (start, count, stride, scalar)
 
         # array shape drops dimensions where a scalar index was selected
+        length = tuple(count * block for count, block in zip(count, block))
         self._array_shape = tuple(
             dim_length for dim_length, scalar in zip(length, scalar) if not scalar
         )
@@ -340,9 +344,9 @@ class SimpleSelection(Selection):
         Then the broadcast method below repeats that chunk 10
         times to write to an effective shape of (10, 5, 4, 1).
         """
-        start, count, step, scalar = self._sel
+        scalar = self._sel[3]
 
-        rank = len(count)
+        rank = len(self.mshape)
         remaining_src_dims = list(source_shape)
 
         eshape = []
@@ -351,7 +355,7 @@ class SimpleSelection(Selection):
                 eshape.append(1)
             else:
                 t = remaining_src_dims.pop()
-                if t == 1 or count[-idx] == t:
+                if t == 1 or self.mshape[-idx] == t:
                     eshape.append(t)
                 else:
                     raise TypeError("Can't broadcast %s -> %s" % (source_shape, self.array_shape))  # array shape
@@ -378,19 +382,19 @@ class SimpleSelection(Selection):
             yield self._id
             return
 
-        start, count, step, scalar = self._sel
+        start, _count, step, _scalar = self._sel
 
-        rank = len(count)
+        rank = len(self.mshape)
         tshape = self.expand_shape(source_shape)
 
-        chunks = tuple(x//y for x, y in zip(count, tshape))
+        chunks = tuple(x//y for x, y in zip(self.mshape, tshape))
         nchunks = product(chunks)
 
         if nchunks == 1:
             yield self._id
         else:
             sid = self._id.copy()
-            sid.select_hyperslab((0,)*rank, tshape, step)
+            sid.select_hyperslab((0,)*rank, tshape, step, self._block_shape)
             for idx in range(nchunks):
                 offset = tuple(x*y*z + s for x, y, z, s in zip(np.unravel_index(idx, chunks), tshape, step, start))
                 sid.offset_simple(offset)
