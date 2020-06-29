@@ -355,7 +355,7 @@ class SimpleSelection(Selection):
                 eshape.append(1)
             else:
                 t = remaining_src_dims.pop()
-                if t == 1 or self.mshape[-idx] == t:
+                if t == 1 or self.mshape[-idx] == t or self._block_shape[-idx] == t:
                     eshape.append(t)
                 else:
                     raise TypeError("Can't broadcast %s -> %s" % (source_shape, self.array_shape))  # array shape
@@ -385,18 +385,25 @@ class SimpleSelection(Selection):
         start, _count, step, _scalar = self._sel
 
         rank = len(self.mshape)
-        tshape = self.expand_shape(source_shape)
+        chunk_shape = self.expand_shape(source_shape)
 
-        chunks = tuple(x//y for x, y in zip(self.mshape, tshape))
+        chunks = tuple(x//y for x, y in zip(self.mshape, chunk_shape))
         nchunks = product(chunks)
 
         if nchunks == 1:
             yield self._id
         else:
             sid = self._id.copy()
-            sid.select_hyperslab((0,)*rank, tshape, step, self._block_shape)
+            sid.select_hyperslab((0,)*rank, (1,)*rank, step, chunk_shape)
             for idx in range(nchunks):
-                offset = tuple(x*y*z + s for x, y, z, s in zip(np.unravel_index(idx, chunks), tshape, step, start))
+                offset = tuple(
+                    start_ + chunk_idx * step_
+                    for start_, step_, chunk_idx in zip(
+                        start,
+                        step,
+                        np.unravel_index(idx, chunks)
+                    )
+                )
                 sid.offset_simple(offset)
                 yield sid
 

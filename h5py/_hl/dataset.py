@@ -857,13 +857,13 @@ class Dataset(HLObject):
         if mshape == () and selection.array_shape != ():
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
-            if any(length > 1 for length in selection._block_shape) or (
-                self.chunks and (
-                    numpy.prod(self.chunks, dtype=numpy.float) >=
-                    numpy.prod(selection.array_shape, dtype=numpy.float)
-                )
-            ):
+            if self.chunks and (numpy.prod(self.chunks, dtype=numpy.float) >=
+                                numpy.prod(selection.array_shape, dtype=numpy.float)):
                 val2 = numpy.empty(selection.array_shape, dtype=val.dtype)
+            elif any(length > 1 for length in selection._block_shape):
+                write_shape = list(selection._block_shape)
+                write_shape[-1] = selection.array_shape[-1]
+                val2 = numpy.empty(write_shape, dtype=val.dtype)
             else:
                 val2 = numpy.empty(selection.array_shape[-1], dtype=val.dtype)
             val2[...] = val
